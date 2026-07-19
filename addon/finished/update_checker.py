@@ -5,7 +5,7 @@ import re
 import socket
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from .release_metadata import (
     CURRENT_RELEASE_CHANNEL,
@@ -58,22 +58,30 @@ def check_for_update(
         headers={"Accept": "application/json", "User-Agent": "Finished?-addon-update-checker"},
         method="GET",
     )
+    default_opener = opener is None
     opener = opener or build_opener(_RejectRedirectHandler())
 
     try:
-        with opener.open(request, timeout=timeout) as response:
-            status_code = response.getcode()
-            if not 200 <= status_code < 300:
-                return UpdateCheckResult(state=CHECK_FAILED, error="http_error")
-            raw = response.read(MAX_METADATA_BYTES + 1)
+        raw = _read_metadata(opener, request, timeout)
     except (socket.timeout, TimeoutError):
         return UpdateCheckResult(state=CHECK_FAILED, error="request_timeout")
     except HTTPError:
         return UpdateCheckResult(state=CHECK_FAILED, error="http_error")
-    except URLError:
-        return UpdateCheckResult(state=CHECK_FAILED, error="network_error")
-    except OSError:
-        return UpdateCheckResult(state=CHECK_FAILED, error="network_error")
+    except (URLError, OSError):
+        if not default_opener:
+            return UpdateCheckResult(state=CHECK_FAILED, error="network_error")
+        try:
+            raw = _read_metadata(
+                build_opener(ProxyHandler({}), _RejectRedirectHandler()), request, timeout
+            )
+        except (socket.timeout, TimeoutError):
+            return UpdateCheckResult(state=CHECK_FAILED, error="request_timeout")
+        except HTTPError:
+            return UpdateCheckResult(state=CHECK_FAILED, error="http_error")
+        except (URLError, OSError):
+            return UpdateCheckResult(state=CHECK_FAILED, error="network_error")
+        except Exception:
+            return UpdateCheckResult(state=CHECK_FAILED, error="request_failed")
     except Exception:
         return UpdateCheckResult(state=CHECK_FAILED, error="request_failed")
 
@@ -95,6 +103,16 @@ def check_for_update(
             error="blender_incompatible",
         )
     return UpdateCheckResult(state=CHECK_UPDATE_AVAILABLE, metadata=metadata)
+
+
+def _read_metadata(opener, request, timeout):
+    with opener.open(request, timeout=timeout) as response:
+        status_code = response.getcode()
+        if not 200 <= status_code < 300:
+            raise HTTPError(
+                request.full_url, status_code, "metadata HTTP status", getattr(response, "headers", None), None
+            )
+        return response.read(MAX_METADATA_BYTES + 1)
 
 
 def is_allowed_metadata_url(url: str) -> bool:
