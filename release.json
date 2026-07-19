@@ -5,7 +5,7 @@
   "version": "1.0.2",
   "min_blender_version": "5.0.0",
   "download_url": "https://github.com/xomke/finished/releases/download/v1.0.2/finished-1.0.2.zip",
-  "sha256": "8b505a8cdf6071874a7890feab1ab22fe3f1983276d8f912f418737e1d5a4f89",
-  "notes_ru": "Проверка автоматической установки обновления на Windows.",
-  "notes_en": "Test automatic update installation on Windows."
+  "sha256": "8ee0509425c0f7717b040d47c178fc36c0de0aa8ee3b0c00ffbba6ed40f4839d",
+  "notes_ru": "Исправлено скачивание обновлений через GitHub Releases.",
+  "notes_en": "Fixed update downloads through GitHub Releases."
 }

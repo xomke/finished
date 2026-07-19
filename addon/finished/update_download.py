@@ -8,7 +8,8 @@ from pathlib import Path
 import tempfile
 import tomllib
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, build_opener
+from urllib.parse import urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
 from . import update_checker
@@ -23,6 +24,13 @@ CACHE_DIRECTORY_NAME = "updates"
 PACKAGE_IDENTITY_NAME = "release_identity.json"
 MANIFEST_NAME = "blender_manifest.toml"
 EXPECTED_EXTENSION_ID = "finished"
+MAX_PACKAGE_REDIRECTS = 3
+GITHUB_RELEASE_ASSET_HOSTS = frozenset(
+    {
+        "release-assets.githubusercontent.com",
+        "objects.githubusercontent.com",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -50,7 +58,7 @@ def download_and_verify(metadata: ReleaseMetadata, blender_version: str, cache_d
             prefix="finished-update-", suffix=".part", dir=cache_directory
         )
         temporary_path = Path(temporary_name)
-        opener = opener or build_opener(update_checker._RejectRedirectHandler())
+        opener = opener or build_opener(_GitHubReleaseRedirectHandler())
         request = Request(
             metadata.download_url,
             headers={"Accept": "application/zip", "User-Agent": "Finished?-addon-update-download"},
@@ -143,6 +151,40 @@ def _read_package_identity(archive):
 def _unsafe_zip_name(name):
     path = Path(name)
     return path.is_absolute() or ".." in path.parts or "\\" in name
+
+
+def _is_allowed_github_release_asset_url(url):
+    """Accept only HTTPS redirects to GitHub's release asset hosts."""
+
+    try:
+        parsed = urlparse(url)
+        port = parsed.port
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname in GITHUB_RELEASE_ASSET_HOSTS
+        and not parsed.username
+        and not parsed.password
+        and port in (None, 443)
+    )
+
+
+class _GitHubReleaseRedirectHandler(HTTPRedirectHandler):
+    """Permit GitHub Releases' signed CDN hand-off, but no arbitrary redirects."""
+
+    def __init__(self):
+        super().__init__()
+        self._redirect_count = 0
+
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        self._redirect_count += 1
+        if (
+            self._redirect_count > MAX_PACKAGE_REDIRECTS
+            or not _is_allowed_github_release_asset_url(newurl)
+        ):
+            raise URLError("package redirect is not allowed")
+        return super().redirect_request(request, fp, code, msg, headers, newurl)
 
 
 def _remove_file(path):
