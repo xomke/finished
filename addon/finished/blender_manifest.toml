@@ -1,0 +1,19 @@
+schema_version = "1.0.0"
+
+id = "finished"
+version = "1.0.0"
+name = "Finished?"
+tagline = "Monitor Blender animation sequence renders"
+maintainer = "Finished? contributors"
+website = "https://finished.xomke.art"
+type = "add-on"
+
+blender_version_min = "5.0.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+tags = [
+  "Render",
+]
