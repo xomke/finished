@@ -25,12 +25,12 @@ CHECK_UPDATE_AVAILABLE = "update_available"
 CHECK_FAILED = "check_failed"
 
 CHECK_TIMEOUT_SECONDS = 3.0
-DEFAULT_RELEASE_METADATA_URL = "https://raw.githubusercontent.com/xomke/finished/main/release.json"
+DEFAULT_RELEASE_METADATA_URL = "https://api.finished.xomke.art/_finished-public-feed-91a7e6c4/release.json"
 
-_RELEASE_METADATA_HOST = "raw.githubusercontent.com"
-_RELEASE_METADATA_PATH = "/xomke/finished/main/release.json"
-_PACKAGE_DOWNLOAD_HOST = "github.com"
-_PACKAGE_DOWNLOAD_PATH_PATTERN = re.compile('^/xomke/finished/releases/download/v[0-9]+\\.[0-9]+\\.[0-9]+/finished-[0-9]+\\.[0-9]+\\.[0-9]+\\.zip$')
+_RELEASE_METADATA_HOST = "api.finished.xomke.art"
+_RELEASE_METADATA_PATH = "/_finished-public-feed-91a7e6c4/release.json"
+_PACKAGE_DOWNLOAD_HOST = "api.finished.xomke.art"
+_PACKAGE_DOWNLOAD_PATH_PATTERN = re.compile('^/_finished-public-feed-91a7e6c4/finished-[0-9]+\\.[0-9]+\\.[0-9]+\\.zip$')
 
 
 @dataclass(frozen=True)

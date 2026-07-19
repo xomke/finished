@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "finished"
-version = "1.0.2"
+version = "1.0.3"
 name = "Finished?"
 tagline = "Monitor Blender animation sequence renders"
 maintainer = "Finished? contributors"
