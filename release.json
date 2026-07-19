@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "channel": "public",
+  "status": "stable",
+  "version": "1.0.0",
+  "min_blender_version": "5.0.0",
+  "download_url": "https://github.com/xomke/finished/releases/download/v1.0.0/finished-1.0.0.zip",
+  "sha256": "75d9f980a580c9f87417d0c99058f6f8cd00596cc1264946efcaa2f461f170f9",
+  "notes_ru": "Первый публичный выпуск Finished?.",
+  "notes_en": "First public release of Finished?."
+}
