@@ -2,10 +2,10 @@
   "schema_version": 1,
   "channel": "public",
   "status": "stable",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "min_blender_version": "5.0.0",
-  "download_url": "https://github.com/xomke/finished/releases/download/v1.0.1/finished-1.0.1.zip",
-  "sha256": "a7fd0af4d099ba63130ca067d96c6a7135c3e0724ca4650b8230a89116edad85",
-  "notes_ru": "Улучшена совместимость будущих обновлений.",
-  "notes_en": "Improved compatibility for future updates."
+  "download_url": "https://github.com/xomke/finished/releases/download/v1.0.2/finished-1.0.2.zip",
+  "sha256": "8b505a8cdf6071874a7890feab1ab22fe3f1983276d8f912f418737e1d5a4f89",
+  "notes_ru": "Проверка автоматической установки обновления на Windows.",
+  "notes_en": "Test automatic update installation on Windows."
 }

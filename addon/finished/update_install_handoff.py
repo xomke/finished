@@ -13,6 +13,9 @@ from . import update_monitor
 
 EXPECTED_EXTENSION_ID = "finished"
 SYSTEM_PYTHON = Path("/usr/bin/python3")
+WINDOWS_POWERSHELL = Path(
+    os.environ.get("SystemRoot", r"C:\Windows")
+) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
 RECONCILIATION_POLL_SECONDS = 1.0
 _reconciliation_callback = None
 
@@ -36,28 +39,67 @@ def repository_module_for_package(package_name, repositories):
 def start_handoff(package_path, *, package_name, bpy_module, popen=subprocess.Popen, process_id=None):
     """Start a detached helper. It waits; this function never installs the package itself."""
 
-    if sys.platform != "darwin":
+    if sys.platform not in {"darwin", "win32"}:
         return HandoffResult(False, "post_exit_install_unsupported")
     package = Path(package_path)
     if not package_path or not package.is_absolute() or package.suffix.lower() != ".zip" or not package.is_file():
         return HandoffResult(False, "prepared_package_missing")
     repositories = getattr(getattr(bpy_module.context.preferences, "extensions", None), "repos", ())
     repository = repository_module_for_package(package_name, repositories)
-    helper = Path(__file__).with_name("post_exit_extension_install.py")
     blender_binary = Path(getattr(bpy_module.app, "binary_path", ""))
-    # Blender terminates its bundled Python as part of app shutdown.  The
-    # detached helper must therefore use macOS' independent system Python.
-    python_binary = SYSTEM_PYTHON
-    if not repository or not helper.is_file() or not blender_binary.is_file() or not python_binary.is_file():
+    if not repository or not blender_binary.is_file():
         return HandoffResult(False, "post_exit_install_unavailable")
     result_path = package.with_suffix(".install-result.json")
-    command = [str(python_binary), str(helper), "--wait-pid", str(process_id or os.getpid()),
+    if sys.platform == "darwin":
+        return _start_macos_handoff(
+            package, repository, blender_binary, result_path, popen, process_id
+        )
+    if sys.platform == "win32":
+        return _start_windows_handoff(
+            package, repository, blender_binary, result_path, popen, process_id
+        )
+    return HandoffResult(False, "post_exit_install_unsupported")
+
+
+def _start_macos_handoff(package, repository, blender_binary, result_path, popen, process_id):
+    """Use macOS' independent Python because Blender terminates its own Python on exit."""
+
+    helper = Path(__file__).with_name("post_exit_extension_install.py")
+    if not helper.is_file() or not SYSTEM_PYTHON.is_file():
+        return HandoffResult(False, "post_exit_install_unavailable")
+    command = [str(SYSTEM_PYTHON), str(helper), "--wait-pid", str(process_id or os.getpid()),
                "--blender", str(blender_binary), "--repo", repository, "--package", str(package),
                "--result-file", str(result_path)]
     try:
         helper_process = popen(command, close_fds=True, start_new_session=True)
     except OSError:
         return HandoffResult(False, "post_exit_install_launch_failed")
+    return _handoff_result(helper_process, result_path)
+
+
+def _start_windows_handoff(package, repository, blender_binary, result_path, popen, process_id):
+    """Use detached PowerShell so the installer survives Blender closing on Windows."""
+
+    helper = Path(__file__).with_name("post_exit_extension_install_windows.ps1")
+    if not helper.is_file() or not WINDOWS_POWERSHELL.is_file():
+        return HandoffResult(False, "post_exit_install_unavailable")
+    command = [
+        str(WINDOWS_POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+        "-File", str(helper), "-WaitPid", str(process_id or os.getpid()), "-Blender", str(blender_binary),
+        "-Repository", repository, "-Package", str(package), "-ResultFile", str(result_path),
+    ]
+    creationflags = (
+        getattr(subprocess, "DETACHED_PROCESS", 0)
+        | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    )
+    try:
+        helper_process = popen(command, close_fds=True, creationflags=creationflags)
+    except OSError:
+        return HandoffResult(False, "post_exit_install_launch_failed")
+    return _handoff_result(helper_process, result_path)
+
+
+def _handoff_result(helper_process, result_path):
     helper_pid = getattr(helper_process, "pid", 0)
     return HandoffResult(True, result_path=str(result_path), helper_pid=helper_pid if helper_pid > 0 else 0)
 
