@@ -91,6 +91,7 @@ def _start_windows_handoff(package, repository, blender_binary, result_path, pop
     creationflags = (
         getattr(subprocess, "DETACHED_PROCESS", 0)
         | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        | getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
     )
     try:
         helper_process = popen(command, close_fds=True, creationflags=creationflags)
