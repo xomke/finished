@@ -19,6 +19,7 @@ from .onboarding import (
     is_device_token_configured,
     render_connection_status,
 )
+from .protocol import API_PROTOCOL_VERSION
 from .preflight import run_preflight
 from .render_session import RenderSession
 from .version import ADDON_VERSION_STRING
@@ -649,6 +650,7 @@ def _complete_pairing_with_retry(api_base_url, pairing_code):
         device_name=device_name,
         blender_version=blender_version,
         addon_version=ADDON_VERSION_STRING,
+        api_version=API_PROTOCOL_VERSION,
         timeout=api_client.PAIRING_TIMEOUT_SECONDS,
     )
     if result.ok or not _is_tls_handshake_timeout(result):
@@ -665,6 +667,7 @@ def _complete_pairing_with_retry(api_base_url, pairing_code):
         device_name=device_name,
         blender_version=blender_version,
         addon_version=ADDON_VERSION_STRING,
+        api_version=API_PROTOCOL_VERSION,
         timeout=api_client.PAIRING_TIMEOUT_SECONDS,
     )
 
@@ -806,6 +809,17 @@ def _cached_blocking_device_check(preferences):
     )
     if state.status == device_connection_state.STATUS_INVALID:
         return api_client.ApiResult(ok=False, status_code=401, error="Invalid device token")
+
+    if state.status == device_connection_state.STATUS_UPDATE_REQUIRED:
+        return api_client.ApiResult(
+            ok=True,
+            status_code=200,
+            data={
+                "telegram_chat_id": "connected",
+                "update_required": True,
+                "update_reason": state.last_error,
+            },
+        )
 
     return api_client.ApiResult(ok=True, status_code=200, data={"telegram_chat_id": None})
 

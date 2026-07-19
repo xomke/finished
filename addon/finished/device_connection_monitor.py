@@ -8,6 +8,7 @@ from . import device_connection_state
 from .device_name import local_device_name
 from . import local_log
 from .onboarding import is_device_token_configured
+from .protocol import API_PROTOCOL_VERSION
 from .version import ADDON_VERSION_STRING
 
 
@@ -144,7 +145,7 @@ def _start_check(preferences, token, now):
     blender_version = _blender_version()
     thread = threading.Thread(
         target=_run_check,
-        args=(api_base_url, token, device_name, blender_version, ADDON_VERSION_STRING),
+        args=(api_base_url, token, device_name, blender_version, ADDON_VERSION_STRING, API_PROTOCOL_VERSION),
         name="FinishedDeviceConnectionCheck",
         daemon=True,
     )
@@ -153,7 +154,7 @@ def _start_check(preferences, token, now):
     thread.start()
 
 
-def _run_check(api_base_url, token, device_name, blender_version, addon_version):
+def _run_check(api_base_url, token, device_name, blender_version, addon_version, api_version):
     started_at = time.time()
     result = api_client.check_in_device(
         api_base_url,
@@ -161,6 +162,7 @@ def _run_check(api_base_url, token, device_name, blender_version, addon_version)
         device_name=device_name,
         blender_version=blender_version,
         addon_version=addon_version,
+        api_version=api_version,
         timeout=DEVICE_CHECK_TIMEOUT_SECONDS,
     )
     finished_at = time.time()

@@ -24,6 +24,8 @@ UNPAIRED_TOKEN_RENDER_MESSAGE = (
     "Open the Finished? bot in Telegram and connect Blender again."
 )
 
+UPDATE_REQUIRED_RENDER_MESSAGE = "Finished? needs an update before starting a monitored render."
+
 
 UNPAIRED_RENDER_LINES = (
     "Finished? is not connected to Telegram yet.",
@@ -56,6 +58,11 @@ UNPAIRED_TOKEN_RENDER_LINES = (
     "Connect Blender through the Finished? bot again.",
 )
 
+UPDATE_REQUIRED_RENDER_LINES = (
+    "Finished? needs an update before starting a monitored render.",
+    "Install the latest version, then try again.",
+)
+
 
 def is_device_token_configured(device_token):
     return bool((device_token or "").strip())
@@ -72,6 +79,15 @@ def render_connection_status(device_token, device_check_result):
 
     if device_check_result.ok:
         data = device_check_result.data or {}
+        if data.get("update_required"):
+            reason = str(data.get("update_reason") or "").strip()
+            message = reason or UPDATE_REQUIRED_RENDER_MESSAGE
+            return {
+                "ok": False,
+                "clear_token": False,
+                "message": message,
+                "lines": (message, "Install the latest version, then try again."),
+            }
         if data.get("telegram_chat_id"):
             return {
                 "ok": True,

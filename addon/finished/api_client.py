@@ -354,6 +354,7 @@ def check_in_device(
     device_name="",
     blender_version="",
     addon_version="",
+    api_version=1,
     timeout=DEFAULT_TIMEOUT_SECONDS,
 ):
     url = _join_url(api_base_url, "/api/devices/me/check-in")
@@ -368,6 +369,7 @@ def check_in_device(
             "device_name": str(device_name or "") or None,
             "blender_version": str(blender_version or "") or None,
             "addon_version": str(addon_version or "") or None,
+            "api_version": api_version,
         }
     ).encode("utf-8")
     result = _open_json_request(
@@ -465,6 +467,7 @@ def complete_pairing(
     device_name="Local Blender",
     blender_version="",
     addon_version="",
+    api_version=1,
     timeout=DEFAULT_TIMEOUT_SECONDS,
 ):
     url = _join_url(api_base_url, "/api/pairing/complete")
@@ -474,6 +477,7 @@ def complete_pairing(
             "device_name": device_name,
             "blender_version": str(blender_version or "") or None,
             "addon_version": str(addon_version or "") or None,
+            "api_version": api_version,
         }
     ).encode("utf-8")
     headers = {

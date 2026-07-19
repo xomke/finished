@@ -7,6 +7,7 @@ STATUS_VALID = "valid"
 STATUS_INVALID = "invalid"
 STATUS_UNPAIRED = "unpaired"
 STATUS_SERVER_UNREACHABLE = "server_unreachable"
+STATUS_UPDATE_REQUIRED = "update_required"
 
 STATUSES = {
     STATUS_UNKNOWN,
@@ -15,9 +16,10 @@ STATUSES = {
     STATUS_INVALID,
     STATUS_UNPAIRED,
     STATUS_SERVER_UNREACHABLE,
+    STATUS_UPDATE_REQUIRED,
 }
 
-BLOCKING_STATUSES = {STATUS_INVALID, STATUS_UNPAIRED}
+BLOCKING_STATUSES = {STATUS_INVALID, STATUS_UNPAIRED, STATUS_UPDATE_REQUIRED}
 VALID_FRESH_SECONDS = 120.0
 
 
@@ -176,12 +178,26 @@ def mark_server_unreachable(state, now, error, *, next_check_after=0.0):
     )
 
 
+def mark_update_required(state, now, error):
+    return DeviceConnectionState(
+        status=STATUS_UPDATE_REQUIRED,
+        last_success_at=0.0,
+        last_check_at=now,
+        last_failure_at=0.0,
+        last_error=str(error or "A newer Finished? version is required."),
+        failure_count=0,
+        next_check_after=0.0,
+    )
+
+
 def apply_device_check_result(state, result, now, *, device_token_configured=True):
     if not device_token_configured:
         return mark_unpaired(state, now, error="Device token is missing")
 
     if result.ok:
         data = result.data or {}
+        if data.get("update_required"):
+            return mark_update_required(state, now, data.get("update_reason"))
         if data.get("telegram_chat_id"):
             return mark_valid(state, now)
         return mark_unpaired(state, now)
