@@ -23,7 +23,6 @@ from . import preferences
 from . import render_handlers
 from . import update_monitor
 from . import update_download_monitor
-from . import update_install_handoff
 from . import state_paths
 
 
@@ -49,15 +48,13 @@ def register():
         )
         if state_paths.local_state_namespace() == state_paths.DEVELOPMENT_NAMESPACE:
             addon_preferences.clear_matching_legacy_preferences(preferences_value, device_token, bpy)
+        update_download_monitor.recover_after_start(preferences_value)
         current_version = ".".join(str(part) for part in ADDON_VERSION)
-        result = update_install_handoff.reconcile_after_start(preferences_value, current_version)
-        if result == "" and getattr(preferences_value, "update_download_state", "") == "install_pending_exit":
-            update_install_handoff.schedule_reconciliation(preferences_value, current_version, bpy)
+        update_download_monitor.reconcile_after_restart(preferences_value, current_version)
     local_log.info("Finished? add-on registered.")
 
 
 def unregister():
-    update_install_handoff.cancel_reconciliation()
     for module in reversed(MODULES):
         module.unregister()
     local_log.info("Finished? add-on unregistered.")

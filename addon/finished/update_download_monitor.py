@@ -9,7 +9,8 @@ from . import local_log
 from . import render_handlers
 from . import update_checker
 from . import update_download
-from . import update_install_handoff
+from . import update_in_place_install
+from . import update_monitor
 from .release_metadata import ReleaseMetadataError, compare_versions, parse_release_metadata
 from .version import ADDON_VERSION_STRING
 
@@ -51,17 +52,32 @@ def stop():
     _timer_registered = False
 
 
-def request_download(preferences):
+def recover_after_start(preferences):
+    """Forget a download interrupted by Blender shutdown; it never changed the add-on."""
+
+    if getattr(preferences, "update_download_state", "") not in {"queued", "downloading"}:
+        return False
+    update_download.discard_interrupted_downloads()
+    preferences.update_download_state = "not_downloaded"
+    preferences.update_prepared_package_path = ""
+    preferences.update_download_error = ""
+    local_log.info("Finished? discarded an interrupted update download after Blender restart.")
+    return True
+
+
+def request_download(preferences, *, automatic=False):
     """Queue a validated release for background download without starting network work here."""
 
-    if _has_running_download() or _has_pending_request() or render_handlers.current_session() is not None:
+    if _has_running_download() or _has_pending_request():
+        return False
+    if render_handlers.current_session() is not None and not automatic:
         return False
     metadata = _metadata_from_preferences(preferences)
     if metadata is None:
         return False
     global _pending_request, _stopped
     with _lock:
-        _pending_request = metadata
+        _pending_request = (metadata, automatic)
     _stopped = False
     preferences.update_download_state = "queued"
     preferences.update_download_error = ""
@@ -83,16 +99,28 @@ def _timer_callback():
         _ensure_timer_registered(BUSY_RECHECK_SECONDS)
         return None
     with _lock:
-        metadata = _pending_request
+        request = _pending_request
         _pending_request = None
-    if metadata is None:
+    if request is None:
         return None
+    metadata, automatic = request
     if render_handlers.current_session() is not None:
+        if automatic:
+            with _lock:
+                _pending_request = request
+            _ensure_timer_registered(BUSY_RECHECK_SECONDS)
+            return None
         _write_failure(preferences, "render_active")
         return None
     _start_download(preferences, metadata)
     _ensure_timer_registered(BUSY_RECHECK_SECONDS)
     return None
+
+
+def request_automatic_install(preferences):
+    """Queue an update discovered by the enabled automatic update policy."""
+
+    return request_download(preferences, automatic=True)
 
 
 def _start_download(preferences, metadata):
@@ -131,39 +159,54 @@ def _apply_pending_result(preferences):
     if result is None:
         return
     if result.prepared:
-        _start_post_exit_install(preferences, result.path)
+        _install_for_next_restart(preferences, result.path)
         return
     _write_failure(preferences, result.error or "download_failed")
 
 
-def _start_post_exit_install(preferences, package_path):
-    """Arm the safe post-exit installer after the explicit download action succeeds."""
+def _install_for_next_restart(preferences, package_path):
+    """Replace files on disk, leaving loaded modules untouched until restart."""
 
-    try:
-        import bpy
-    except ImportError:
-        _write_failure(preferences, "post_exit_install_unavailable")
+    if render_handlers.current_session() is not None:
+        _write_failure(preferences, "render_active")
         return
-    handoff = update_install_handoff.start_handoff(
-        package_path, package_name=__package__, bpy_module=bpy
-    )
-    if not handoff.started:
-        _write_failure(preferences, handoff.error or "post_exit_install_unavailable")
+    result = update_in_place_install.install_prepared_package(package_path)
+    if not result.installed:
+        _write_failure(preferences, result.error or "install_failed")
         return
-    preferences.update_download_state = "install_pending_exit"
-    preferences.update_prepared_package_path = str(package_path)
-    preferences.update_install_result_path = handoff.result_path
-    preferences.update_install_helper_pid = handoff.helper_pid
+    update_download._remove_file(package_path)
+    preferences.update_download_state = "restart_required"
+    preferences.update_prepared_package_path = ""
     preferences.update_download_error = ""
-    local_log.info("Finished? update downloaded, verified, and prepared for installation after Blender exits.")
+    local_log.info("Finished? update installed on disk; restart Blender to load the new version.")
+
+
+def reconcile_after_restart(preferences, current_version):
+    """Clear the restart banner only after the replacement version has loaded."""
+
+    if getattr(preferences, "update_download_state", "") != "restart_required":
+        return ""
+    try:
+        updated = compare_versions(
+            current_version, getattr(preferences, "update_latest_version", "")
+        ) >= 0
+    except ReleaseMetadataError:
+        updated = False
+    if not updated:
+        _write_failure(preferences, "install_failed")
+        return "failed"
+    preferences.update_download_state = "not_downloaded"
+    preferences.update_prepared_package_path = ""
+    preferences.update_download_error = ""
+    update_monitor.clear_available_update(preferences)
+    local_log.info("Finished? update loaded after Blender restart.")
+    return "installed"
 
 
 def _write_failure(preferences, error):
     preferences.update_download_state = "download_failed"
     preferences.update_download_error = error
     preferences.update_prepared_package_path = ""
-    preferences.update_install_result_path = ""
-    preferences.update_install_helper_pid = 0
     local_log.info(f"Finished? update package was not prepared: error={error}")
 
 

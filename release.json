@@ -2,10 +2,10 @@
   "schema_version": 1,
   "channel": "public",
   "status": "stable",
-  "version": "1.0.3",
+  "version": "1.0.18",
   "min_blender_version": "5.0.0",
-  "download_url": "https://api.finished.xomke.art/_finished-public-feed-91a7e6c4/finished-1.0.3.zip",
-  "sha256": "32ecd4477d02683efbf6c28cb8bce79f81239ae0341e8d0d7b05efc42461795f",
-  "notes_ru": "Обновления аддона теперь загружаются с сервера Finished?.",
-  "notes_en": "Add-on updates now download from the Finished? server."
+  "download_url": "https://api.finished.xomke.art/_finished-public-feed-91a7e6c4/finished-1.0.18.zip",
+  "sha256": "2e2d440417ccd0b3f87a42553eceafcd111c17bda5a6ab7b6e7800522e804697",
+  "notes_ru": "Безопасное автоматическое обновление, удаление legacy helper и уточнённая подсказка установки.",
+  "notes_en": "Safe automatic updates, legacy helper removal, and clarified install tooltip."
 }

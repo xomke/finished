@@ -83,7 +83,5 @@ _LEGACY_RESET_VALUES = {
     "update_notified_version": "",
     "update_download_state": "not_downloaded",
     "update_prepared_package_path": "",
-    "update_install_result_path": "",
-    "update_install_helper_pid": 0,
     "update_download_error": "",
 }

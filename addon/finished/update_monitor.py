@@ -117,15 +117,19 @@ def _timer_callback():
         _ensure_timer_registered(BUSY_RECHECK_SECONDS)
         return None
 
+    global _manual_check_requested
+    global _startup_check_pending
+    manual_check_requested = _manual_check_requested
+    startup_check_pending = _startup_check_pending
+    if not manual_check_requested and startup_check_pending and not getattr(preferences, "auto_check_updates", True):
+        _startup_check_pending = False
+        return None
+
     if render_handlers.current_session() is not None:
         _ensure_timer_registered(RENDER_RECHECK_SECONDS)
         return None
 
     now = time.time()
-    global _manual_check_requested
-    global _startup_check_pending
-    manual_check_requested = _manual_check_requested
-    startup_check_pending = _startup_check_pending
     if not manual_check_requested and not startup_check_pending and not getattr(preferences, "auto_check_updates", True):
         return None
     due_at = next_check_at(preferences)
@@ -204,6 +208,7 @@ def _apply_pending_result(preferences):
 
     preferences.update_last_success_at = pending["finished_at"]
     _write_metadata(preferences, result.metadata)
+    _queue_automatic_install(preferences, result)
     _notify_new_available_update(preferences, result)
     local_log.info(f"Finished? update check completed: state={result.state}")
 
@@ -222,7 +227,7 @@ def _write_metadata(preferences, metadata):
 
 
 def clear_available_update(preferences):
-    """Remove release details after a confirmed post-exit installation."""
+    """Remove release details after a confirmed restart on the new version."""
 
     preferences.update_check_state = update_checker.CHECK_NOT_CHECKED
     preferences.update_last_error = ""
@@ -238,6 +243,8 @@ def _notify_new_available_update(preferences, result):
     metadata = result.metadata
     if result.state != update_checker.CHECK_UPDATE_AVAILABLE or metadata is None:
         return
+    if getattr(preferences, "auto_check_updates", True):
+        return
     if getattr(preferences, "update_notified_version", "") == metadata.version:
         return
     preferences.update_notified_version = metadata.version
@@ -250,10 +257,13 @@ def _notify_startup_available_update(preferences):
     global _startup_notice_pending
     if not _startup_notice_pending:
         return
+    if getattr(preferences, "auto_check_updates", True):
+        _startup_notice_pending = False
+        return False
     has_available_update = (
         getattr(preferences, "update_check_state", "") == update_checker.CHECK_UPDATE_AVAILABLE
         and getattr(preferences, "update_latest_version", "")
-        and getattr(preferences, "update_download_state", "") != "install_pending_exit"
+        and getattr(preferences, "update_download_state", "") != "restart_required"
     )
     if not has_available_update:
         _startup_notice_pending = False
@@ -262,6 +272,19 @@ def _notify_startup_available_update(preferences):
         _startup_notice_pending = False
         return True
     return False
+
+
+def _queue_automatic_install(preferences, result):
+    if (
+        result.state != update_checker.CHECK_UPDATE_AVAILABLE
+        or result.metadata is None
+        or not getattr(preferences, "auto_check_updates", True)
+        or getattr(preferences, "update_download_state", "") in {"queued", "downloading", "restart_required"}
+    ):
+        return False
+    from . import update_download_monitor
+
+    return update_download_monitor.request_automatic_install(preferences)
 
 
 def _has_running_check():

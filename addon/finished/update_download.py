@@ -44,6 +44,19 @@ def default_cache_directory():
     return state_paths.state_directory() / CACHE_DIRECTORY_NAME
 
 
+def discard_interrupted_downloads(cache_directory=None):
+    """Remove only incomplete or unclaimed update downloads from an earlier Blender run."""
+
+    cache_directory = Path(cache_directory or default_cache_directory())
+    try:
+        for path in cache_directory.glob("finished-update-*.part"):
+            _remove_file(path)
+        for path in cache_directory.glob("finished-update-*.zip"):
+            _remove_file(path)
+    except OSError:
+        pass
+
+
 def download_and_verify(metadata: ReleaseMetadata, blender_version: str, cache_directory=None, opener=None):
     """Download one package to a temporary file, verify it, then atomically prepare it."""
 

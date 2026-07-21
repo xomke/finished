@@ -118,8 +118,11 @@ class FINISHED_AddonPreferences(bpy.types.AddonPreferences):
     )
 
     auto_check_updates: bpy.props.BoolProperty(
-        name="Automatically check for updates",
-        description="Check once after Blender starts, then every hour. Checks wait for the current render to finish.",
+        name="Auto-check for updates",
+        description=(
+            "Checks after Blender starts, then every hour. New updates download, verify, and "
+            "install automatically after the current Finished? render. Restart Blender to use them."
+        ),
         default=True,
         update=_auto_check_updates_changed,
     )
@@ -223,23 +226,8 @@ class FINISHED_AddonPreferences(bpy.types.AddonPreferences):
 
     update_prepared_package_path: bpy.props.StringProperty(
         name="Prepared Update Package Path",
-        description="Internal verified update package path; installation has not happened",
+        description="Internal path for the verified update package during installation",
         default="",
-        options={"HIDDEN"},
-    )
-
-    update_install_result_path: bpy.props.StringProperty(
-        name="Update Install Result Path",
-        description="Internal post-exit installer receipt path",
-        default="",
-        options={"HIDDEN"},
-    )
-
-    update_install_helper_pid: bpy.props.IntProperty(
-        name="Update Install Helper PID",
-        description="Internal PID for the post-exit installer helper",
-        default=0,
-        min=0,
         options={"HIDDEN"},
     )
 
@@ -297,12 +285,11 @@ class FINISHED_AddonPreferences(bpy.types.AddonPreferences):
         language = update_presentation.current_language()
         update_box.label(text=update_presentation.text("updates", language), icon="FILE_REFRESH")
         update_box.prop(self, "auto_check_updates", text=update_presentation.text("automatic_check", language))
-        update_box.label(text=update_presentation.text("automatic_check_on", language), icon="INFO")
 
         actions = update_box.row()
         actions.scale_y = 1.5
         check = actions.column()
-        check.enabled = self.update_check_state != "checking"
+        check.enabled = not self.auto_check_updates and self.update_check_state != "checking"
         check.operator(
             FINISHED_OT_check_updates.bl_idname,
             text=update_presentation.text("check_now", language),
@@ -311,14 +298,15 @@ class FINISHED_AddonPreferences(bpy.types.AddonPreferences):
         actions.separator(factor=0.35)
         download = actions.column()
         can_download = (
-            self.update_check_state == "update_available"
-            and self.update_download_state not in {"queued", "downloading", "install_pending_exit"}
+            not self.auto_check_updates
+            and self.update_check_state == "update_available"
+            and self.update_download_state not in {"queued", "downloading", "restart_required"}
             and render_handlers.current_session() is None
         )
         download.enabled = can_download
         download.operator(
             FINISHED_OT_download_update.bl_idname,
-            text=update_presentation.text("download", language),
+            text=update_presentation.text("install", language),
             icon="IMPORT",
         )
 
@@ -347,7 +335,7 @@ class FINISHED_AddonPreferences(bpy.types.AddonPreferences):
                     notes_box = update_box.box()
                     for line in notes.splitlines():
                         notes_box.label(text=line)
-            if self.update_download_state == "install_pending_exit":
+            if self.update_download_state == "restart_required":
                 restart_box = update_box.box()
                 restart_box.alert = True
                 restart_box.label(text=update_presentation.text("restart_to_update", language), icon="ERROR")

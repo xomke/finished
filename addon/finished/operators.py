@@ -587,7 +587,7 @@ class FINISHED_OT_show_update_available(bpy.types.Operator):
 class FINISHED_OT_download_update(bpy.types.Operator):
     bl_idname = "finished.download_update"
     bl_label = "Download Finished? Update"
-    bl_description = "Download and verify a Finished? update without installing it"
+    bl_description = "Download, verify, and install the latest Finished? update"
     bl_options = {"INTERNAL"}
 
     def execute(self, context):
